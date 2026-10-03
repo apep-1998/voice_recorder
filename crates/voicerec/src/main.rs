@@ -16,6 +16,8 @@ fn main() -> anyhow::Result<()> {
         cli::Command::Config { command } => commands::config::run(command, cli.config.as_deref()),
         cli::Command::Devices => commands::devices::run(cli.config.as_deref()),
         cli::Command::Daemon => commands::daemon::run(cli.config.as_deref()),
+        cli::Command::Status => commands::status::run(cli.config.as_deref()),
+        cli::Command::Reindex => commands::reindex::run(cli.config.as_deref()),
         cli::Command::DebugRecord {
             seconds,
             output_dir,

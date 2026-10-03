@@ -63,6 +63,14 @@ pub async fn run(config: &Config, shutdown: watch::Receiver<bool>) -> Result<(),
 
     let engine = CaptureEngine::start(targets, EngineSettings::from_config(config), bus.clone())?;
 
+    let retention_task = tokio::spawn(crate::store::retention::run_retention_task(
+        layout.clone(),
+        Arc::clone(&index),
+        config.storage.retention,
+        config.storage.max_disk_bytes,
+        shutdown.clone(),
+    ));
+
     // Wait for shutdown, then stop capture so sinks see StreamClosed events
     // and finalize their segments.
     let mut shutdown_rx = shutdown.clone();
@@ -82,5 +90,6 @@ pub async fn run(config: &Config, shutdown: watch::Receiver<bool>) -> Result<(),
             Err(err) => tracing::error!("sink task panicked: {err}"),
         }
     }
+    let _ = retention_task.await;
     Ok(())
 }

@@ -146,6 +146,32 @@ impl Index {
         Ok(paths)
     }
 
+    /// Every segment, oldest end-time first (the retention eviction order).
+    pub fn all_segments_ordered(&self) -> Result<Vec<SegmentRecord>, IndexError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT slug, kind, session_id, utc_start_ns, utc_end_ns,
+                    sample_rate, channels, n_frames, rel_path, clean_close
+             FROM segments ORDER BY utc_end_ns",
+        )?;
+        let rows = stmt.query_map([], row_to_segment)?;
+        collect_rows(rows)
+    }
+
+    /// Per-slug segment count and last activity, for `voicerec status`.
+    pub fn slug_summaries(&self) -> Result<Vec<(String, u64, UtcNs)>, IndexError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT slug, COUNT(*), MAX(utc_end_ns) FROM segments GROUP BY slug ORDER BY slug",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                u64::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                i64_to_ns(row.get(2)?),
+            ))
+        })?;
+        collect_rows(rows)
+    }
+
     /// Remove one segment row by relative path.
     pub fn delete_by_rel_path(&self, rel_path: &str) -> Result<(), IndexError> {
         self.conn.execute(

@@ -75,9 +75,27 @@ instant in the segment. Drift between the two clocks beyond a threshold
 simply the absence of segments; exports fill them with silence so that
 mic/monitor tracks stay aligned to wall-clock for mixing.
 
-A logind `PrepareForSleep` watcher (with a delay inhibitor) finalizes
-segments before suspend; the drift detector is the fallback when the signal
-is missed.
+A logind `PrepareForSleep` watcher finalizes segments before suspend (best
+effort); the clock-drift detector is the primary safety net — on resume the
+wall clock has jumped far past the sample clock, so the open segment is
+finalized and a new session begins, turning the suspend into a clean gap
+rather than corruption. It needs no D-Bus, so it also covers missed signals,
+driver stalls, and NTP steps.
+
+### Manual power-test matrix
+
+These are verified by hand (they can't run in CI); after each, `voicerec
+list` must show a clean gap and every segment must be a valid, decodable
+`.opus` with no leftover `.part` files:
+
+| Event | Expected |
+|-------|----------|
+| `systemctl --user restart voice-recorder` | open segments finalized, recording resumes, new session |
+| suspend / resume (`systemctl suspend`) | suspend interval is a gap; segments before and after are clean |
+| lid close / open | same as suspend |
+| unplug then replug a recorded mic | gap while absent; recording resumes when it returns |
+| hard power loss (pull power) | at most the final ~1 s lost; `.part` salvaged into a playable segment on next start |
+| reboot | service autostarts; prior audio still listed and exportable |
 
 ### Export
 

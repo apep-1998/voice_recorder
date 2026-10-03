@@ -13,6 +13,7 @@ pub mod device;
 pub mod encode;
 pub mod error;
 pub mod export;
+pub mod power;
 pub mod recorder;
 pub mod store;
 pub mod timeline;

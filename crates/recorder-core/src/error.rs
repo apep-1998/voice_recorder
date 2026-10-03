@@ -72,6 +72,13 @@ pub enum EncodeError {
     BadBitrate(u32),
 }
 
+/// Errors from power-event integration (logind).
+#[derive(Debug, thiserror::Error)]
+pub enum PowerError {
+    #[error("D-Bus error: {0}")]
+    Dbus(String),
+}
+
 /// Errors from the recorder service (daemon).
 #[derive(Debug, thiserror::Error)]
 pub enum RecorderError {

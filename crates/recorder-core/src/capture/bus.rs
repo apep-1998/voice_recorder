@@ -57,13 +57,18 @@ pub enum BusEvent {
     },
     /// Capture for this device stopped (device removed or engine shutdown).
     StreamClosed { slug: Arc<str> },
+    /// Finalize every open segment now, without ending the session (used
+    /// before suspend so nothing is lost if the machine freezes mid-segment).
+    FlushAll,
 }
 
 impl BusEvent {
-    pub fn slug(&self) -> &Arc<str> {
+    /// The device this event concerns, if it is device-specific.
+    pub fn slug(&self) -> Option<&Arc<str>> {
         match self {
-            BusEvent::Frame(frame) => &frame.slug,
-            BusEvent::Discontinuity { slug, .. } | BusEvent::StreamClosed { slug } => slug,
+            BusEvent::Frame(frame) => Some(&frame.slug),
+            BusEvent::Discontinuity { slug, .. } | BusEvent::StreamClosed { slug } => Some(slug),
+            BusEvent::FlushAll => None,
         }
     }
 }

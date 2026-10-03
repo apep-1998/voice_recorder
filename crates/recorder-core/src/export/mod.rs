@@ -40,3 +40,73 @@ pub fn export_single(
     ffmpeg::run_ffmpeg(&args)?;
     Ok(plan)
 }
+
+/// Export several devices mixed into one aligned file (mic + monitor =
+/// complete meeting).
+///
+/// # Panics
+/// Panics if the index mutex is poisoned.
+pub fn export_mixed(
+    layout: &StorageLayout,
+    index: &Arc<Mutex<Index>>,
+    slugs: &[String],
+    start_ns: UtcNs,
+    end_ns: UtcNs,
+    compact: bool,
+    output: &Path,
+) -> Result<Vec<TrackPlan>, ExportError> {
+    let plans = plan_tracks(index, slugs, start_ns, end_ns, compact)?;
+    if !plans.iter().any(TrackPlan::has_audio) {
+        return Err(ExportError::NoAudio);
+    }
+    let args = ffmpeg::mixed_args(&plans, layout.root(), output)?;
+    ffmpeg::run_ffmpeg(&args)?;
+    Ok(plans)
+}
+
+/// Export several devices to a separate file each (via `output_for(slug)`).
+/// Devices with no audio in the window are skipped.
+///
+/// # Panics
+/// Panics if the index mutex is poisoned.
+pub fn export_separate(
+    layout: &StorageLayout,
+    index: &Arc<Mutex<Index>>,
+    slugs: &[String],
+    start_ns: UtcNs,
+    end_ns: UtcNs,
+    compact: bool,
+    output_for: impl Fn(&str) -> std::path::PathBuf,
+) -> Result<Vec<(String, std::path::PathBuf)>, ExportError> {
+    let plans = plan_tracks(index, slugs, start_ns, end_ns, compact)?;
+    let mut written = Vec::new();
+    for plan in plans {
+        if !plan.has_audio() {
+            continue;
+        }
+        let path = output_for(&plan.slug);
+        let args = ffmpeg::single_track_args(&plan, layout.root(), &path)?;
+        ffmpeg::run_ffmpeg(&args)?;
+        written.push((plan.slug, path));
+    }
+    if written.is_empty() {
+        return Err(ExportError::NoAudio);
+    }
+    Ok(written)
+}
+
+fn plan_tracks(
+    index: &Arc<Mutex<Index>>,
+    slugs: &[String],
+    start_ns: UtcNs,
+    end_ns: UtcNs,
+    compact: bool,
+) -> Result<Vec<TrackPlan>, ExportError> {
+    let guard = index.lock().expect("index lock");
+    let mut plans = Vec::with_capacity(slugs.len());
+    for slug in slugs {
+        let segments = guard.overlapping(slug, start_ns, end_ns)?;
+        plans.push(plan_track(slug, &segments, start_ns, end_ns, compact));
+    }
+    Ok(plans)
+}

@@ -20,7 +20,16 @@ conversation).
 - **Retention window**: keep the last N hours/days (`retention = "5d"`),
   older segments are purged automatically.
 - **Time-range export**: `voicerec export --last 2h -o out.opus`, with
-  mic/output mixing aligned by wall-clock time.
+  mic/output mixing aligned by wall-clock time:
+
+  ```sh
+  voicerec list --last 2h                 # what was recorded, with gaps
+  voicerec export --last 2h -o out.opus    # one device, last 2 hours
+  voicerec export --from "8h ago" --to "4h ago" -o window.opus
+  voicerec export --from "yesterday 15:50" --to "yesterday 16:20" -o mtg.opus
+  voicerec export --last 1h --mix -o meeting.opus      # mic + output mixed
+  voicerec export --last 1h --devices DJI,monitor      # one file per device
+  ```
 - **Crash & power safe**: 60-second Ogg/Opus segments survive power loss,
   suspend, lid close, and reboots; gaps are tracked, not corrupted.
 - **Listener fan-out (planned)**: external programs (e.g. a wake-word

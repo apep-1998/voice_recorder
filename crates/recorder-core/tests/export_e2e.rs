@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use recorder_core::device::StreamKind;
 use recorder_core::encode::SegmentWriter;
-use recorder_core::export::export_single;
+use recorder_core::export::{export_mixed, export_single};
 use recorder_core::store::index::{Index, SegmentRecord};
 use recorder_core::store::layout::{segment_rel_path, StorageLayout};
 
@@ -42,6 +42,27 @@ fn probe_duration_secs(path: &std::path::Path) -> f64 {
         .expect("duration parses")
 }
 
+fn probe_channels(path: &std::path::Path) -> u32 {
+    let out = Command::new("ffprobe")
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=channels",
+            "-of",
+            "csv=p=0",
+        ])
+        .arg(path)
+        .output()
+        .expect("ffprobe runs");
+    String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .parse()
+        .expect("channels parse")
+}
+
 /// Write a real Opus segment of `secs` seconds of a sine tone and index it.
 fn write_segment(
     layout: &StorageLayout,
@@ -51,13 +72,40 @@ fn write_segment(
     secs: u64,
     freq: f32,
 ) {
+    write_segment_ch(
+        layout,
+        index,
+        slug,
+        start_ns,
+        secs,
+        freq,
+        1,
+        StreamKind::Mic,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_segment_ch(
+    layout: &StorageLayout,
+    index: &Arc<Mutex<Index>>,
+    slug: &str,
+    start_ns: u64,
+    secs: u64,
+    freq: f32,
+    channels: u8,
+    kind: StreamKind,
+) {
     let rel = segment_rel_path(slug, start_ns, "sess0001");
     let abs = layout.root().join(&rel);
-    let mut writer = SegmentWriter::create(abs, 1, 32_000).unwrap();
+    let mut writer = SegmentWriter::create(abs, channels, 32_000).unwrap();
     let total = (secs * u64::from(RATE)) as usize;
-    let samples: Vec<f32> = (0..total)
-        .map(|i| (i as f32 * freq * 2.0 * std::f32::consts::PI / RATE as f32).sin() * 0.5)
-        .collect();
+    let mut samples: Vec<f32> = Vec::with_capacity(total * usize::from(channels));
+    for i in 0..total {
+        let v = (i as f32 * freq * 2.0 * std::f32::consts::PI / RATE as f32).sin() * 0.5;
+        for _ in 0..channels {
+            samples.push(v);
+        }
+    }
     writer.write_samples(&samples).unwrap();
     let finalized = writer.finalize().unwrap();
     index
@@ -65,12 +113,12 @@ fn write_segment(
         .unwrap()
         .insert_segment(&SegmentRecord {
             slug: slug.to_owned(),
-            kind: StreamKind::Mic,
+            kind,
             session_id: "sess0001".into(),
             utc_start_ns: start_ns,
             utc_end_ns: start_ns + secs * SEC,
             sample_rate: RATE,
-            channels: 1,
+            channels,
             n_frames: finalized.n_frames,
             rel_path: rel.to_string_lossy().into_owned(),
             clean_close: true,
@@ -126,6 +174,48 @@ fn compact_export_skips_the_gap() {
     // Compact output is just the 20s of real audio, no silent gap.
     let dur = probe_duration_secs(&out);
     assert!((dur - 20.0).abs() < 0.1, "expected ~20s, got {dur}");
+}
+
+#[test]
+fn mixes_mono_mic_and_stereo_monitor_into_stereo() {
+    if !ffprobe_available() {
+        eprintln!("ffprobe not found; skipping");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let layout = StorageLayout::new(dir.path().to_owned());
+    let index = Arc::new(Mutex::new(Index::open_in_memory().unwrap()));
+
+    let base = 1_000_000_000_000_u64;
+    // Mic (mono, 440Hz) and monitor (stereo, 880Hz) overlapping the same 10s.
+    write_segment_ch(&layout, &index, "mic", base, 10, 440.0, 1, StreamKind::Mic);
+    write_segment_ch(
+        &layout,
+        &index,
+        "sink.monitor",
+        base,
+        10,
+        880.0,
+        2,
+        StreamKind::Monitor,
+    );
+
+    let out = dir.path().join("mix.wav");
+    export_mixed(
+        &layout,
+        &index,
+        &["mic".into(), "sink.monitor".into()],
+        base,
+        base + 10 * SEC,
+        false,
+        &out,
+    )
+    .unwrap();
+
+    assert!(out.exists());
+    assert!((probe_duration_secs(&out) - 10.0).abs() < 0.1);
+    // Mixing a mono and a stereo source yields a stereo file.
+    assert_eq!(probe_channels(&out), 2);
 }
 
 #[test]

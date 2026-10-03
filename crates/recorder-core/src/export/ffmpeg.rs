@@ -40,6 +40,63 @@ pub fn single_track_args(
     Ok(args)
 }
 
+/// Build ffmpeg args for mixing several device tracks into one file. Every
+/// track is planned over the same window, so `amix` keeps them aligned to
+/// wall-clock time (my voice from the mic + the other side from the monitor
+/// line up exactly). `normalize=0` keeps each source at its own level instead
+/// of attenuating by the number of inputs.
+pub fn mixed_args(
+    plans: &[TrackPlan],
+    storage_root: &Path,
+    output: &Path,
+) -> Result<Vec<String>, ExportError> {
+    let real: Vec<&TrackPlan> = plans.iter().filter(|p| p.has_audio()).collect();
+    if real.is_empty() {
+        return Err(ExportError::NoAudio);
+    }
+    if real.len() == 1 {
+        return single_track_args(real[0], storage_root, output);
+    }
+
+    let mut args: Vec<String> = vec![
+        "-y".into(),
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+    ];
+    let mut filters: Vec<String> = Vec::new();
+    let mut input_index = 0_usize;
+    let mut track_labels = Vec::new();
+
+    for (t, plan) in real.iter().enumerate() {
+        let (inputs, filter, label) = build_track(plan, storage_root, input_index);
+        input_index += inputs.len();
+        for input in inputs {
+            args.extend(input);
+        }
+        // Coerce every track to stereo so a mono mic mixed with a stereo
+        // monitor yields a stereo result instead of amix downmixing to mono.
+        let track_label = format!("mix{t}");
+        filters.push(format!(
+            "{filter};[{label}]aformat=channel_layouts=stereo[{track_label}]"
+        ));
+        track_labels.push(format!("[{track_label}]"));
+    }
+
+    filters.push(format!(
+        "{}amix=inputs={}:normalize=0[out]",
+        track_labels.concat(),
+        track_labels.len()
+    ));
+
+    args.push("-filter_complex".into());
+    args.push(filters.join(";"));
+    args.push("-map".into());
+    args.push("[out]".into());
+    args.push(output.to_string_lossy().into_owned());
+    Ok(args)
+}
+
 /// Build the inputs and concat filter for one track. Returns (per-input arg
 /// groups, filter string producing `[cN]`, output label).
 fn build_track(
@@ -221,6 +278,76 @@ mod tests {
         let p = plan(vec![], 1);
         assert!(matches!(
             single_track_args(&p, Path::new("/root"), Path::new("/out.wav")),
+            Err(ExportError::NoAudio)
+        ));
+    }
+
+    #[test]
+    fn mixed_builds_stereo_amix_over_tracks() {
+        let a = plan(
+            vec![TrackPart::Segment {
+                rel_path: "a.opus".into(),
+                seg_offset_ns: 0,
+                duration_ns: 10 * SEC,
+            }],
+            1,
+        );
+        let mut b = plan(
+            vec![TrackPart::Segment {
+                rel_path: "b.opus".into(),
+                seg_offset_ns: 0,
+                duration_ns: 10 * SEC,
+            }],
+            2,
+        );
+        b.slug = "mon".into();
+        let args = mixed_args(&[a, b], Path::new("/root"), Path::new("/mix.opus")).unwrap();
+        let s = joined(&args);
+        assert!(s.contains("amix=inputs=2:normalize=0[out]"), "{s}");
+        // Each track is coerced to stereo before mixing.
+        assert_eq!(
+            s.matches("aformat=channel_layouts=stereo").count(),
+            2,
+            "{s}"
+        );
+        assert!(s.contains("-i /root/a.opus"), "{s}");
+        assert!(s.contains("-i /root/b.opus"), "{s}");
+        assert!(s.contains("-map [out]"), "{s}");
+    }
+
+    #[test]
+    fn mixed_with_one_audio_track_falls_back_to_single() {
+        let a = plan(
+            vec![TrackPart::Segment {
+                rel_path: "a.opus".into(),
+                seg_offset_ns: 0,
+                duration_ns: 10 * SEC,
+            }],
+            1,
+        );
+        let silent = plan(
+            vec![TrackPart::Silence {
+                duration_ns: 10 * SEC,
+            }],
+            1,
+        );
+        let args = mixed_args(&[a, silent], Path::new("/root"), Path::new("/mix.opus")).unwrap();
+        let s = joined(&args);
+        // No amix needed when only one track has audio.
+        assert!(!s.contains("amix"), "{s}");
+        assert!(s.contains("concat=n=1"), "{s}");
+    }
+
+    #[test]
+    fn mixed_all_silent_errors() {
+        let silent = plan(
+            vec![TrackPart::Silence {
+                duration_ns: 10 * SEC,
+            }],
+            1,
+        );
+        assert!(matches!(
+            mixed_args(&[silent], Path::new("/root"), Path::new("/mix.opus")),
             Err(ExportError::NoAudio)
         ));
     }

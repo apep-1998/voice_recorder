@@ -26,6 +26,22 @@ fn main() -> anyhow::Result<()> {
             &commands::list::RangeArgs { last, from, to },
             device.as_deref(),
         ),
+        cli::Command::Export {
+            last,
+            from,
+            to,
+            device,
+            output,
+            compact,
+        } => commands::export::run(
+            cli.config.as_deref(),
+            &commands::export::ExportArgs {
+                range: commands::list::RangeArgs { last, from, to },
+                device,
+                output,
+                compact,
+            },
+        ),
         cli::Command::Status => commands::status::run(cli.config.as_deref()),
         cli::Command::Reindex => commands::reindex::run(cli.config.as_deref()),
         cli::Command::DebugRecord {

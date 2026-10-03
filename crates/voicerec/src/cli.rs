@@ -41,6 +41,28 @@ pub enum Command {
         #[arg(long, value_name = "SUBSTR")]
         device: Option<String>,
     },
+    /// Export a time range of one device to a single audio file.
+    Export {
+        /// Window ending now, e.g. "2h", "90m".
+        #[arg(long, value_name = "DURATION")]
+        last: Option<String>,
+        /// Range start, e.g. "8h ago", "yesterday 15:50".
+        #[arg(long, value_name = "TIME")]
+        from: Option<String>,
+        /// Range end (defaults to now).
+        #[arg(long, value_name = "TIME")]
+        to: Option<String>,
+        /// Device slug substring (required if more than one device exists).
+        #[arg(long, value_name = "SUBSTR")]
+        device: Option<String>,
+        /// Output file; the extension sets the format (.opus/.wav/.flac/.mp3).
+        #[arg(short, long, value_name = "FILE")]
+        output: Option<PathBuf>,
+        /// Drop recording gaps instead of filling them with silence (loses
+        /// wall-clock alignment).
+        #[arg(long)]
+        compact: bool,
+    },
     /// Show what is stored: segment counts, time span, disk usage.
     Status,
     /// Rebuild the segment index from the files on disk.

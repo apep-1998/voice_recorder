@@ -98,6 +98,25 @@ pub enum RecorderError {
     },
 }
 
+/// Errors from exporting a time range.
+#[derive(Debug, thiserror::Error)]
+pub enum ExportError {
+    #[error(transparent)]
+    Index(#[from] IndexError),
+
+    #[error("no audio in the requested time range")]
+    NoAudio,
+
+    #[error("could not run ffmpeg (is it installed and on PATH?)")]
+    Spawn {
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("ffmpeg failed:\n{stderr}")]
+    Ffmpeg { stderr: String },
+}
+
 /// Errors from the SQLite segment index.
 #[derive(Debug, thiserror::Error)]
 pub enum IndexError {

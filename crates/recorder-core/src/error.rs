@@ -79,6 +79,20 @@ pub enum PowerError {
     Dbus(String),
 }
 
+/// Errors from the fan-out server.
+#[derive(Debug, thiserror::Error)]
+pub enum FanoutError {
+    #[error("I/O error on {path}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("protocol error: {0}")]
+    Protocol(String),
+}
+
 /// Errors from the recorder service (daemon).
 #[derive(Debug, thiserror::Error)]
 pub enum RecorderError {

@@ -32,8 +32,11 @@ conversation).
   ```
 - **Crash & power safe**: 60-second Ogg/Opus segments survive power loss,
   suspend, lid close, and reboots; gaps are tracked, not corrupted.
-- **Listener fan-out (planned)**: external programs (e.g. a wake-word
-  detector) can subscribe to the live audio stream over a Unix socket.
+- **Listener fan-out**: external programs (e.g. a "hey jarvis" wake-word
+  detector) can subscribe to the live audio stream over a Unix socket while
+  recording continues — see [docs/PROTOCOL.md](docs/PROTOCOL.md) and
+  [examples/subscribe.py](examples/subscribe.py). Enable with `[fanout]
+  enabled = true`.
 
 ## Status
 

@@ -2,4 +2,6 @@
 
 pub mod index;
 pub mod layout;
+pub mod reindex;
+pub mod retention;
 pub mod salvage;

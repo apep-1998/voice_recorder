@@ -26,6 +26,10 @@ pub enum Command {
     /// Run the recorder daemon: capture the configured devices continuously
     /// into the segment store (what the systemd service runs).
     Daemon,
+    /// Show what is stored: segment counts, time span, disk usage.
+    Status,
+    /// Rebuild the segment index from the files on disk.
+    Reindex,
     /// Record the configured devices to raw WAV files for a few seconds
     /// (debugging aid to verify capture works).
     DebugRecord {

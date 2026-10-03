@@ -7,12 +7,13 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::watch;
 
-use crate::capture::bus::FrameBus;
+use crate::capture::bus::{BusEvent, FrameBus};
 use crate::capture::engine::{CaptureEngine, EngineSettings};
 use crate::capture::pipewire::{snapshot_graph, DEFAULT_SNAPSHOT_TIMEOUT};
 use crate::config::Config;
 use crate::device::{select_targets, StreamKind};
 use crate::error::RecorderError;
+use crate::power::{SleepEvent, SleepWatcher};
 use crate::store::index::Index;
 use crate::store::layout::StorageLayout;
 use crate::store::salvage::salvage_startup;
@@ -71,6 +72,14 @@ pub async fn run(config: &Config, shutdown: watch::Receiver<bool>) -> Result<(),
         shutdown.clone(),
     ));
 
+    // Optional: finalize segments before the machine suspends. The clock-drift
+    // detector in the capture engine already turns a suspend into a clean gap,
+    // so this is a best-effort refinement — failure to connect to logind is
+    // logged, not fatal.
+    if config.power.logind_integration {
+        spawn_sleep_watcher(bus.clone(), shutdown.clone());
+    }
+
     // Wait for shutdown, then stop capture so sinks see StreamClosed events
     // and finalize their segments.
     let mut shutdown_rx = shutdown.clone();
@@ -92,4 +101,39 @@ pub async fn run(config: &Config, shutdown: watch::Receiver<bool>) -> Result<(),
     }
     let _ = retention_task.await;
     Ok(())
+}
+
+/// Spawn a background thread that watches logind for suspend events and asks
+/// the sinks to flush before the machine sleeps. Best-effort: if logind is
+/// unavailable the thread logs and exits, leaving the drift detector as the
+/// safety net.
+fn spawn_sleep_watcher(bus: FrameBus, shutdown: watch::Receiver<bool>) {
+    std::thread::Builder::new()
+        .name("voicerec-sleep".into())
+        .spawn(move || {
+            let mut watcher = match crate::power::ZbusSleepWatcher::connect() {
+                Ok(w) => w,
+                Err(err) => {
+                    tracing::warn!("logind unavailable; relying on drift detection: {err}");
+                    return;
+                }
+            };
+            tracing::info!("watching logind for suspend/resume");
+            while !*shutdown.borrow() {
+                match watcher.next_event() {
+                    Some(SleepEvent::GoingToSleep) => {
+                        tracing::info!("suspend imminent; flushing segments");
+                        bus.publish(BusEvent::FlushAll);
+                        // Give sinks a moment to finalize within the inhibitor
+                        // window before the kernel freezes us.
+                        std::thread::sleep(std::time::Duration::from_millis(300));
+                    }
+                    Some(SleepEvent::Resumed) => {
+                        tracing::info!("resumed from suspend");
+                    }
+                    None => break,
+                }
+            }
+        })
+        .ok();
 }

@@ -64,7 +64,7 @@ pub fn run(config_path: Option<&Path>, seconds: u64, output_dir: &Path) -> anyho
             Ok(BusEvent::Discontinuity { slug, drift_ns, .. }) => {
                 println!("  discontinuity on {slug}: {} ms", drift_ns / 1_000_000);
             }
-            Ok(BusEvent::StreamClosed { .. }) => {}
+            Ok(BusEvent::StreamClosed { .. } | BusEvent::FlushAll) => {}
             Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
                 std::thread::sleep(Duration::from_millis(20));
             }

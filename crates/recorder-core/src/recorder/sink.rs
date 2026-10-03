@@ -28,6 +28,7 @@ enum CloseReason {
     Discontinuity,
     StreamClosed,
     Shutdown,
+    Flush,
 }
 
 /// Runs until the bus closes, the stream closes, or `shutdown` flips to true.
@@ -82,6 +83,11 @@ pub async fn run_sink(
                 if slug == sink.slug {
                     sink.close_current(CloseReason::StreamClosed)?;
                 }
+            }
+            Ok(BusEvent::FlushAll) => {
+                // Finalize before suspend; the session continues (a real gap,
+                // if any, is caught by the drift detector on resume).
+                sink.close_current(CloseReason::Flush)?;
             }
             Err(broadcast::error::RecvError::Lagged(missed)) => {
                 tracing::warn!(slug = %sink.slug, missed, "sink lagged; audio dropped");
@@ -359,6 +365,48 @@ mod tests {
         let (finalized, rows, _dir) = h.finish().await;
         assert_eq!(finalized, 0);
         assert_eq!(rows.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn flush_all_finalizes_without_ending_session() {
+        let h = start_sink(60);
+        let start = 4_000_000_000_000;
+        // Some audio, then a pre-suspend flush, then more audio.
+        h.bus.publish(frame(&h.slug, 0, start, 9_600));
+        h.bus.publish(BusEvent::FlushAll);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        h.bus.publish(frame(&h.slug, 1, start + 200_000_000, 9_600));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let (finalized, rows, _dir) = h.finish().await;
+
+        // Two segments (flushed + final), same session (flush doesn't rotate it).
+        assert_eq!(finalized, 2);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].session_id, rows[1].session_id);
+    }
+
+    #[tokio::test]
+    async fn suspend_resume_via_discontinuity_leaves_clean_gap() {
+        // Simulates what the capture engine's drift detector emits across a
+        // suspend: audio, a Discontinuity, then audio an hour later.
+        let h = start_sink(60);
+        let start = 5_000_000_000_000;
+        h.bus.publish(frame(&h.slug, 0, start, 9_600));
+        h.bus.publish(BusEvent::Discontinuity {
+            slug: Arc::clone(&h.slug),
+            kind: StreamKind::Mic,
+            drift_ns: 3_600_000_000_000, // 1h suspend
+        });
+        h.bus
+            .publish(frame(&h.slug, 1, start + 3_600_000_000_000, 9_600));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let (_finalized, rows, _dir) = h.finish().await;
+
+        assert_eq!(rows.len(), 2);
+        assert_ne!(rows[0].session_id, rows[1].session_id);
+        // The hour-long suspend is a gap between segments, not corruption.
+        let gap = rows[1].utc_start_ns - rows[0].utc_end_ns;
+        assert!(gap >= 3_500_000_000_000, "gap was {gap}ns");
     }
 
     #[tokio::test]

@@ -41,14 +41,32 @@ the design.
 ## Quick start
 
 ```sh
-cargo build --release
+cargo install --path crates/voicerec
 
 # write the default config to ~/.config/voice_recorder/config.toml
-./target/release/voicerec config init
+voicerec config init
 
-# validate the config
-./target/release/voicerec config check
+# see your devices and what would be recorded
+voicerec devices
+
+# run the recorder in the foreground (Ctrl-C to stop)
+voicerec daemon
 ```
+
+## Run as a service
+
+```sh
+mkdir -p ~/.config/systemd/user
+cp systemd/voice-recorder.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now voice-recorder
+
+journalctl --user -u voice-recorder -f   # watch the logs
+```
+
+The service restarts automatically and finalizes segments cleanly on stop,
+suspend, and shutdown. To record before you log in (e.g. right after boot),
+enable lingering: `loginctl enable-linger $USER` (optional).
 
 ## Configuration
 

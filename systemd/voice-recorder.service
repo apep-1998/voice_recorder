@@ -1,0 +1,18 @@
+[Unit]
+Description=Continuous background audio recorder (voicerec)
+Documentation=https://github.com/apep-1998/voice_recorder
+# PipeWire is a user service; start after it so devices are available.
+After=pipewire.service
+Wants=pipewire.service
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/voicerec daemon
+Restart=always
+RestartSec=2
+# Give the daemon time to finalize segments on stop.
+TimeoutStopSec=15
+Environment=RUST_LOG=voicerec=info,recorder_core=info
+
+[Install]
+WantedBy=default.target

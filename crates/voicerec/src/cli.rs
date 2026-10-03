@@ -23,6 +23,16 @@ pub enum Command {
     },
     /// List audio devices and show which ones would be recorded.
     Devices,
+    /// Record the configured devices to raw WAV files for a few seconds
+    /// (debugging aid to verify capture works).
+    DebugRecord {
+        /// How long to record.
+        #[arg(long, default_value_t = 5)]
+        seconds: u64,
+        /// Directory to write one WAV file per device into.
+        #[arg(long, value_name = "DIR")]
+        output_dir: PathBuf,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Subcommand)]

@@ -11,6 +11,7 @@ pub mod capture;
 pub mod config;
 pub mod device;
 pub mod error;
+pub mod timeline;
 
 pub use config::Config;
 pub use error::{CaptureError, ConfigError};

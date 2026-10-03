@@ -35,3 +35,16 @@ pub enum ConfigError {
     #[error("invalid config: {0}")]
     Invalid(String),
 }
+
+/// Errors from the PipeWire capture backend.
+#[derive(Debug, thiserror::Error)]
+pub enum CaptureError {
+    #[error("PipeWire error")]
+    PipeWire(#[from] pipewire::Error),
+
+    #[error("timed out talking to PipeWire — is the PipeWire daemon running?")]
+    Timeout,
+
+    #[error("{0}")]
+    Internal(String),
+}

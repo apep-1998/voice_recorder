@@ -16,6 +16,8 @@ humantime-serde.workspace = true
 directories.workspace = true
 tracing.workspace = true
 chrono.workspace = true
+pipewire = "0.10"
+serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"

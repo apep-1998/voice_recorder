@@ -21,6 +21,8 @@ pub enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
+    /// List audio devices and show which ones would be recorded.
+    Devices,
 }
 
 #[derive(Debug, Clone, Copy, Subcommand)]

@@ -14,5 +14,6 @@ fn main() -> anyhow::Result<()> {
     let cli = cli::Cli::parse();
     match cli.command {
         cli::Command::Config { command } => commands::config::run(command, cli.config.as_deref()),
+        cli::Command::Devices => commands::devices::run(cli.config.as_deref()),
     }
 }

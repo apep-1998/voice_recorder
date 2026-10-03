@@ -7,8 +7,10 @@
 //! fan-out protocol. The `voicerec` binary is a thin CLI/daemon wrapper
 //! around this crate.
 
+pub mod capture;
 pub mod config;
+pub mod device;
 pub mod error;
 
 pub use config::Config;
-pub use error::ConfigError;
+pub use error::{CaptureError, ConfigError};

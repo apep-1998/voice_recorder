@@ -72,6 +72,32 @@ pub enum EncodeError {
     BadBitrate(u32),
 }
 
+/// Errors from the recorder service (daemon).
+#[derive(Debug, thiserror::Error)]
+pub enum RecorderError {
+    #[error(transparent)]
+    Capture(#[from] CaptureError),
+
+    #[error(transparent)]
+    Encode(#[from] EncodeError),
+
+    #[error(transparent)]
+    Index(#[from] IndexError),
+
+    #[error(transparent)]
+    Selection(#[from] crate::device::SelectionError),
+
+    #[error("no devices selected for recording")]
+    NothingToRecord,
+
+    #[error("I/O error on {path}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
 /// Errors from the SQLite segment index.
 #[derive(Debug, thiserror::Error)]
 pub enum IndexError {

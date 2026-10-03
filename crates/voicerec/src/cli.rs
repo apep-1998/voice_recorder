@@ -23,6 +23,9 @@ pub enum Command {
     },
     /// List audio devices and show which ones would be recorded.
     Devices,
+    /// Run the recorder daemon: capture the configured devices continuously
+    /// into the segment store (what the systemd service runs).
+    Daemon,
     /// Record the configured devices to raw WAV files for a few seconds
     /// (debugging aid to verify capture works).
     DebugRecord {

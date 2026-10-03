@@ -16,6 +16,16 @@ fn main() -> anyhow::Result<()> {
         cli::Command::Config { command } => commands::config::run(command, cli.config.as_deref()),
         cli::Command::Devices => commands::devices::run(cli.config.as_deref()),
         cli::Command::Daemon => commands::daemon::run(cli.config.as_deref()),
+        cli::Command::List {
+            last,
+            from,
+            to,
+            device,
+        } => commands::list::run(
+            cli.config.as_deref(),
+            &commands::list::RangeArgs { last, from, to },
+            device.as_deref(),
+        ),
         cli::Command::Status => commands::status::run(cli.config.as_deref()),
         cli::Command::Reindex => commands::reindex::run(cli.config.as_deref()),
         cli::Command::DebugRecord {

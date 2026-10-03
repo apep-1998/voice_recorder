@@ -26,6 +26,21 @@ pub enum Command {
     /// Run the recorder daemon: capture the configured devices continuously
     /// into the segment store (what the systemd service runs).
     Daemon,
+    /// List recorded audio in a time range, with per-device coverage and gaps.
+    List {
+        /// Window ending now, e.g. "2h", "90m", "1h30m".
+        #[arg(long, value_name = "DURATION")]
+        last: Option<String>,
+        /// Range start, e.g. "8h ago", "yesterday 15:50", "2026-10-03 09:00".
+        #[arg(long, value_name = "TIME")]
+        from: Option<String>,
+        /// Range end (defaults to now).
+        #[arg(long, value_name = "TIME")]
+        to: Option<String>,
+        /// Only devices whose slug contains this substring.
+        #[arg(long, value_name = "SUBSTR")]
+        device: Option<String>,
+    },
     /// Show what is stored: segment counts, time span, disk usage.
     Status,
     /// Rebuild the segment index from the files on disk.

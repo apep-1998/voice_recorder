@@ -55,7 +55,17 @@ pub enum Command {
         /// Device slug substring (required if more than one device exists).
         #[arg(long, value_name = "SUBSTR")]
         device: Option<String>,
+        /// Comma-separated device substrings for multi-device export, e.g.
+        /// "DJI,monitor". Combine with --mix to mix them into one file.
+        #[arg(long, value_name = "LIST")]
+        devices: Option<String>,
+        /// Mix the selected devices into one aligned file (mic + output =
+        /// complete meeting). Without it, each device is written separately.
+        #[arg(long)]
+        mix: bool,
         /// Output file; the extension sets the format (.opus/.wav/.flac/.mp3).
+        /// For separate multi-device export the device slug is inserted before
+        /// the extension.
         #[arg(short, long, value_name = "FILE")]
         output: Option<PathBuf>,
         /// Drop recording gaps instead of filling them with silence (loses

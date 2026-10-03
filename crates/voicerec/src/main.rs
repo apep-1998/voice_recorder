@@ -31,6 +31,8 @@ fn main() -> anyhow::Result<()> {
             from,
             to,
             device,
+            devices,
+            mix,
             output,
             compact,
         } => commands::export::run(
@@ -38,8 +40,10 @@ fn main() -> anyhow::Result<()> {
             &commands::export::ExportArgs {
                 range: commands::list::RangeArgs { last, from, to },
                 device,
+                devices,
                 output,
                 compact,
+                mix,
             },
         ),
         cli::Command::Status => commands::status::run(cli.config.as_deref()),

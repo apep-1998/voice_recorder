@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = ["crates/recorder-core", "crates/voicerec"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/apep-1998/voice_recorder"
+rust-version = "1.85"
+
+[workspace.dependencies]
+recorder-core = { path = "crates/recorder-core" }
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+humantime = "2"
+humantime-serde = "1"
+clap = { version = "4.5", features = ["derive"] }
+directories = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+must_use_candidate = "allow"
+
+[profile.release]
+lto = "thin"

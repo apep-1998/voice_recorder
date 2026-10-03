@@ -41,6 +41,8 @@ pub async fn run(config: &Config, shutdown: watch::Receiver<bool>) -> Result<(),
         tracing::info!(slug = %target.slug, kind = target.kind.as_str(), "recording");
     }
 
+    let live_slugs: Vec<String> = targets.iter().map(|t| t.slug.clone()).collect();
+
     let bus = FrameBus::default();
     let mut sinks = Vec::with_capacity(targets.len());
     for target in &targets {
@@ -80,6 +82,19 @@ pub async fn run(config: &Config, shutdown: watch::Receiver<bool>) -> Result<(),
         spawn_sleep_watcher(bus.clone(), shutdown.clone());
     }
 
+    // Optional: live audio fan-out socket for external listeners.
+    let fanout_task = if config.fanout.enabled {
+        let socket_path = config.fanout.socket_path();
+        Some(tokio::spawn(crate::fanout::serve(
+            socket_path,
+            bus.clone(),
+            Arc::new(live_slugs),
+            shutdown.clone(),
+        )))
+    } else {
+        None
+    };
+
     // Wait for shutdown, then stop capture so sinks see StreamClosed events
     // and finalize their segments.
     let mut shutdown_rx = shutdown.clone();
@@ -100,6 +115,9 @@ pub async fn run(config: &Config, shutdown: watch::Receiver<bool>) -> Result<(),
         }
     }
     let _ = retention_task.await;
+    if let Some(task) = fanout_task {
+        let _ = task.await;
+    }
     Ok(())
 }
 

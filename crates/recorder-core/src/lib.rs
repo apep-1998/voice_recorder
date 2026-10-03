@@ -10,7 +10,9 @@
 pub mod capture;
 pub mod config;
 pub mod device;
+pub mod encode;
 pub mod error;
+pub mod store;
 pub mod timeline;
 
 pub use config::Config;

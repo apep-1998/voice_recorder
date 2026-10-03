@@ -48,3 +48,40 @@ pub enum CaptureError {
     #[error("{0}")]
     Internal(String),
 }
+
+/// Errors writing or reading Ogg/Opus segments.
+#[derive(Debug, thiserror::Error)]
+pub enum EncodeError {
+    #[error("opus codec error")]
+    Opus(#[from] opus::Error),
+
+    #[error("I/O error on {path}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("{0} is not an Ogg/Opus file")]
+    NotOpus(PathBuf),
+
+    #[error("unsupported channel count {0} (only 1 or 2 supported)")]
+    BadChannels(u8),
+
+    #[error("invalid Opus bitrate {0}")]
+    BadBitrate(u32),
+}
+
+/// Errors from the SQLite segment index.
+#[derive(Debug, thiserror::Error)]
+pub enum IndexError {
+    #[error("database error")]
+    Sqlite(#[from] rusqlite::Error),
+
+    #[error("I/O error on {path}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+}

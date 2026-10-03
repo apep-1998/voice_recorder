@@ -24,6 +24,27 @@ pub enum StreamKind {
     Monitor,
 }
 
+impl StreamKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Mic => "mic",
+            Self::Monitor => "monitor",
+        }
+    }
+}
+
+impl std::str::FromStr for StreamKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "mic" => Ok(Self::Mic),
+            "monitor" => Ok(Self::Monitor),
+            other => Err(format!("unknown stream kind {other:?}")),
+        }
+    }
+}
+
 /// One audio node from the PipeWire graph.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeInfo {

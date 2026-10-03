@@ -15,5 +15,9 @@ fn main() -> anyhow::Result<()> {
     match cli.command {
         cli::Command::Config { command } => commands::config::run(command, cli.config.as_deref()),
         cli::Command::Devices => commands::devices::run(cli.config.as_deref()),
+        cli::Command::DebugRecord {
+            seconds,
+            output_dir,
+        } => commands::debug_record::run(cli.config.as_deref(), seconds, &output_dir),
     }
 }

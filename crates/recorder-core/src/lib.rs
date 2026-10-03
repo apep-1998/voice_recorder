@@ -15,6 +15,7 @@ pub mod error;
 pub mod recorder;
 pub mod store;
 pub mod timeline;
+pub mod timeparse;
 
 pub use config::Config;
 pub use error::{CaptureError, ConfigError};
